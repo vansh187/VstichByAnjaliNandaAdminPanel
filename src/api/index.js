@@ -39,8 +39,15 @@ async function updateOrderStatusAndInvalidate(orderId, status) {
   return result;
 }
 
+async function syncOrderStatusAndInvalidate(orderId) {
+  const result = await baseApi.syncOrderStatus(orderId);
+  ordersCache = null;
+  return result;
+}
+
 export const adminApi = {
   ...baseApi,
   getOrders: getOrdersCached,
   updateOrderStatus: updateOrderStatusAndInvalidate,
+  syncOrderStatus: syncOrderStatusAndInvalidate,
 };

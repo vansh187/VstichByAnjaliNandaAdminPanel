@@ -10,6 +10,7 @@ export function OrdersTab() {
   const [error, setError] = useState(null);
   const [pendingStatus, setPendingStatus] = useState({});
   const [updatingId, setUpdatingId] = useState(null);
+  const [syncingId, setSyncingId] = useState(null);
   const [log, setLog] = useState([]);
 
   const loadOrders = () => {
@@ -48,6 +49,20 @@ export function OrdersTab() {
       setError(err.message);
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleRefreshStatus = async (orderId) => {
+    setSyncingId(orderId);
+    try {
+      const updated = await adminApi.syncOrderStatus(orderId);
+      setOrders((prev) => prev.map((o) => (o.vstitch_order_id === orderId ? { ...o, ...updated } : o)));
+      const time = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+      setLog((prev) => [{ id: Date.now(), text: `Order ${orderId} live status refreshed`, time }, ...prev].slice(0, 6));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSyncingId(null);
     }
   };
 
@@ -107,10 +122,21 @@ export function OrdersTab() {
                   {new Date(o.created_date).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </td>
                 <td className="px-5 py-4">
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${STATUS_STYLES[o.order_status]}`}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-current inline-block" />
-                    {STATUS_LABELS[o.order_status]}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${STATUS_STYLES[o.order_status]}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-current inline-block" />
+                      {STATUS_LABELS[o.order_status]}
+                    </span>
+                    <button
+                      onClick={() => handleRefreshStatus(o.vstitch_order_id)}
+                      disabled={syncingId === o.vstitch_order_id}
+                      className="inline-flex items-center gap-1 rounded-md border border-[#2A2620] bg-[#141210] px-2 py-1 text-[11px] text-[#EDE7DD] hover:border-[#C9A24B] hover:text-[#F7D788] disabled:opacity-60 disabled:cursor-not-allowed"
+                      title="Refresh live status from Shiprocket"
+                    >
+                      <Icon path={icons.refresh} size={12} />
+                      {syncingId === o.vstitch_order_id ? "Syncing…" : "Refresh"}
+                    </button>
+                  </div>
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-2">

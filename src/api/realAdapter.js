@@ -42,6 +42,10 @@ export async function updateOrderStatus(orderId, order_status) {
   return request(`/admin/orders/${orderId}/status`, { method: 'PATCH', body: { order_status } });
 }
 
+export async function syncOrderStatus(orderId) {
+  return request(`/admin/orders/${orderId}/sync-status`, { method: 'POST' });
+}
+
 // ---------- Revenue ----------
 
 export async function getRevenueSummary(params) {

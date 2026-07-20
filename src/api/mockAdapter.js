@@ -58,6 +58,18 @@ export async function updateOrderStatus(orderId, order_status) {
   return delay(updated);
 }
 
+export async function syncOrderStatus(orderId) {
+  let updated = null;
+  mutateDb((db) => {
+    const order = db.orders.find((o) => o.vstitch_order_id === orderId);
+    if (!order) throw new Error('Order not found.');
+    if (!order.awb_code) throw new Error('This order has no AWB or shipment assigned yet.');
+    updated = { ...order };
+  });
+  if (!updated) throw new Error('Order not found.');
+  return delay(updated);
+}
+
 // ---------- Revenue ----------
 
 export async function getRevenueSummary() {
