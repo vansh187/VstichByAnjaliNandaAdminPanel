@@ -3,16 +3,30 @@ import { Modal } from './Modal.jsx';
 import { CategorySelect } from './CategorySelect.jsx';
 import { adminApi } from '../api/index.js';
 
+function emptyImage() {
+  return {
+    key: Math.random().toString(36).slice(2),
+    image_url: "",
+    is_primary: false,
+  };
+}
+
 function emptyRow() {
   return {
     key: Math.random().toString(36).slice(2),
     product_name: "",
     category_id: "",
+    description: "",
     size: "Standard",
     color: "Standard",
     sku: "",
     price: "",
     stock_quantity: "",
+    weight_kg: "",
+    length_cm: "",
+    breadth_cm: "",
+    height_cm: "",
+    images: [emptyImage()],
   };
 }
 
@@ -40,13 +54,38 @@ export function AddProductModal({ open, onClose, categories, onCategoriesChanged
   const addRow = () => setRows((prev) => [...prev, emptyRow()]);
   const removeRow = (key) => setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.key !== key) : prev));
 
+  const updateImage = (rowKey, imageKey, patch) => {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.key === rowKey
+          ? { ...r, images: r.images.map((img) => (img.key === imageKey ? { ...img, ...patch } : img)) }
+          : r
+      )
+    );
+  };
+  const addImage = (rowKey) =>
+    setRows((prev) => prev.map((r) => (r.key === rowKey ? { ...r, images: [...r.images, emptyImage()] } : r)));
+  const removeImage = (rowKey, imageKey) =>
+    setRows((prev) =>
+      prev.map((r) =>
+        r.key === rowKey ? { ...r, images: r.images.filter((img) => img.key !== imageKey) } : r
+      )
+    );
+
+  const isShippingIncomplete = (r) =>
+    !(Number(r.weight_kg) > 0 && Number(r.length_cm) >= 0.5 && Number(r.breadth_cm) >= 0.5 && Number(r.height_cm) >= 0.5);
+
   const validateLocal = () => {
     const errs = {};
     rows.forEach((r) => {
-      if (!r.product_name.trim()) errs[r.key] = "Product name is required.";
-      else if (!r.category_id) errs[r.key] = "Select a category.";
-      else if (!r.sku.trim()) errs[r.key] = "SKU is required.";
-      else if (!r.price || Number(r.price) <= 0) errs[r.key] = "Enter a valid price.";
+      if (!r.product_name.trim()) { errs[r.key] = "Product name is required."; return; }
+      if (!r.category_id) { errs[r.key] = "Select a category."; return; }
+      if (!r.sku.trim()) { errs[r.key] = "SKU is required."; return; }
+      if (!r.price || Number(r.price) <= 0) { errs[r.key] = "Enter a valid price."; return; }
+      if (r.weight_kg !== "" && Number(r.weight_kg) <= 0) { errs[r.key] = "Weight must be greater than 0."; return; }
+      if (r.length_cm !== "" && Number(r.length_cm) < 0.5) { errs[r.key] = "Length must be at least 0.5 cm."; return; }
+      if (r.breadth_cm !== "" && Number(r.breadth_cm) < 0.5) { errs[r.key] = "Breadth must be at least 0.5 cm."; return; }
+      if (r.height_cm !== "" && Number(r.height_cm) < 0.5) { errs[r.key] = "Height must be at least 0.5 cm."; return; }
     });
     return errs;
   };
@@ -61,20 +100,41 @@ export function AddProductModal({ open, onClose, categories, onCategoriesChanged
     setFormError(null);
     setRowErrors({});
     try {
-      const payload = rows.map((r) => ({
-        product_name: r.product_name.trim(),
-        category_id: Number(r.category_id),
-        base_price: Number(r.price),
-        variants: [
-          {
-            sku: r.sku.trim(),
-            size: r.size.trim() || "Standard",
-            color: r.color.trim() || "Standard",
-            price: Number(r.price),
-            stock_quantity: Number(r.stock_quantity) || 0,
-          },
-        ],
-      }));
+      const payload = rows.map((r) => {
+        const images = r.images
+          .filter((img) => img.image_url.trim())
+          .map((img, idx) => ({
+            image_url: img.image_url.trim(),
+            is_primary: img.is_primary,
+            display_order: idx,
+          }));
+        // Fall back to the first image if the admin added photos but never
+        // checked one as primary — a product with images but no primary
+        // flag would otherwise show no photo on the storefront.
+        if (images.length > 0 && !images.some((img) => img.is_primary)) {
+          images[0].is_primary = true;
+        }
+        return {
+          product_name: r.product_name.trim(),
+          description: r.description.trim() || undefined,
+          category_id: Number(r.category_id),
+          base_price: Number(r.price),
+          variants: [
+            {
+              sku: r.sku.trim(),
+              size: r.size.trim() || "Standard",
+              color: r.color.trim() || "Standard",
+              price: Number(r.price),
+              stock_quantity: Number(r.stock_quantity) || 0,
+              weight_kg: r.weight_kg !== "" ? Number(r.weight_kg) : undefined,
+              length_cm: r.length_cm !== "" ? Number(r.length_cm) : undefined,
+              breadth_cm: r.breadth_cm !== "" ? Number(r.breadth_cm) : undefined,
+              height_cm: r.height_cm !== "" ? Number(r.height_cm) : undefined,
+            },
+          ],
+          ...(images.length > 0 ? { images } : {}),
+        };
+      });
       const { created, errors } = await adminApi.createProducts(payload);
       if (created.length > 0) {
         onProductsCreated(created);
@@ -130,6 +190,16 @@ export function AddProductModal({ open, onClose, categories, onCategoriesChanged
                   className="w-full bg-[#141210] border border-[#2A2620] rounded-md px-3 py-2 text-sm text-[#EDE7DD] focus:outline-none focus:border-[#C9A24B]"
                 />
               </div>
+              <div className="col-span-2">
+                <label className="text-[10px] uppercase tracking-[0.1em] text-[#8A8375] block mb-1">Description</label>
+                <textarea
+                  value={row.description}
+                  onChange={(e) => updateRow(row.key, { description: e.target.value })}
+                  placeholder="Optional product description"
+                  rows={2}
+                  className="w-full bg-[#141210] border border-[#2A2620] rounded-md px-3 py-2 text-sm text-[#EDE7DD] focus:outline-none focus:border-[#C9A24B] resize-y"
+                />
+              </div>
               <div>
                 <label className="text-[10px] uppercase tracking-[0.1em] text-[#8A8375] block mb-1">Category</label>
                 <CategorySelect
@@ -183,6 +253,106 @@ export function AddProductModal({ open, onClose, categories, onCategoriesChanged
                   onChange={(e) => updateRow(row.key, { stock_quantity: e.target.value })}
                   className="w-full bg-[#141210] border border-[#2A2620] rounded-md px-3 py-2 text-sm text-[#EDE7DD] focus:outline-none focus:border-[#C9A24B]"
                 />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] uppercase tracking-[0.1em] text-[#8A8375] block mb-1">
+                  Shipping Dimensions
+                  {isShippingIncomplete(row) && (
+                    <span className="ml-2 normal-case tracking-normal text-[#E0A34B]">shipping info incomplete — required before this product can ship</span>
+                  )}
+                </label>
+                <div className="grid grid-cols-4 gap-3">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Weight (kg)"
+                    value={row.weight_kg}
+                    onChange={(e) => updateRow(row.key, { weight_kg: e.target.value })}
+                    className="w-full bg-[#141210] border border-[#2A2620] rounded-md px-3 py-2 text-sm text-[#EDE7DD] focus:outline-none focus:border-[#C9A24B]"
+                  />
+                  <input
+                    type="number"
+                    min="0.5"
+                    step="0.1"
+                    placeholder="Length (cm)"
+                    value={row.length_cm}
+                    onChange={(e) => updateRow(row.key, { length_cm: e.target.value })}
+                    className="w-full bg-[#141210] border border-[#2A2620] rounded-md px-3 py-2 text-sm text-[#EDE7DD] focus:outline-none focus:border-[#C9A24B]"
+                  />
+                  <input
+                    type="number"
+                    min="0.5"
+                    step="0.1"
+                    placeholder="Breadth (cm)"
+                    value={row.breadth_cm}
+                    onChange={(e) => updateRow(row.key, { breadth_cm: e.target.value })}
+                    className="w-full bg-[#141210] border border-[#2A2620] rounded-md px-3 py-2 text-sm text-[#EDE7DD] focus:outline-none focus:border-[#C9A24B]"
+                  />
+                  <input
+                    type="number"
+                    min="0.5"
+                    step="0.1"
+                    placeholder="Height (cm)"
+                    value={row.height_cm}
+                    onChange={(e) => updateRow(row.key, { height_cm: e.target.value })}
+                    className="w-full bg-[#141210] border border-[#2A2620] rounded-md px-3 py-2 text-sm text-[#EDE7DD] focus:outline-none focus:border-[#C9A24B]"
+                  />
+                </div>
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] uppercase tracking-[0.1em] text-[#8A8375] block mb-1">Images</label>
+                <div className="space-y-2">
+                  {row.images.map((img) => (
+                    <div key={img.key} className="flex items-center gap-2">
+                      <input
+                        value={img.image_url}
+                        onChange={(e) => updateImage(row.key, img.key, { image_url: e.target.value })}
+                        placeholder="https://…/image.jpg"
+                        className="flex-1 bg-[#141210] border border-[#2A2620] rounded-md px-3 py-2 text-sm text-[#EDE7DD] focus:outline-none focus:border-[#C9A24B]"
+                      />
+                      <label className="flex items-center gap-1 text-[10px] uppercase tracking-[0.1em] text-[#8A8375] whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={img.is_primary}
+                          onChange={(e) =>
+                            setRows((prev) =>
+                              prev.map((r) =>
+                                r.key === row.key
+                                  ? {
+                                      ...r,
+                                      images: r.images.map((i) => ({
+                                        ...i,
+                                        is_primary: i.key === img.key ? e.target.checked : e.target.checked ? false : i.is_primary,
+                                      })),
+                                    }
+                                  : r
+                              )
+                            )
+                          }
+                        />
+                        Primary
+                      </label>
+                      {row.images.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeImage(row.key, img.key)}
+                          className="text-[#8A8375] hover:text-[#E0716A] text-lg leading-none px-1"
+                          aria-label="Remove image"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => addImage(row.key)}
+                  className="mt-2 text-xs font-medium text-[#C9A24B] hover:text-[#DAB65E]"
+                >
+                  + Add image URL
+                </button>
               </div>
             </div>
             {rowErrors[row.key] && <p className="text-[#E0716A] text-xs mt-2">{rowErrors[row.key]}</p>}
