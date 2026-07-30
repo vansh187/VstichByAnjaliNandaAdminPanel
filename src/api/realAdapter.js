@@ -29,6 +29,10 @@ export async function login({ admin_username, password }) {
   return res;
 }
 
+export async function resetPassword({ admin_username, email, new_password }) {
+  return request('/admin/reset-password', { method: 'POST', body: { admin_username, email, new_password } });
+}
+
 // ---------- Orders ----------
 
 export async function getOrders({ status, payment_method, search } = {}) {

@@ -26,6 +26,19 @@ export async function login({ admin_username, password }) {
   });
 }
 
+export async function resetPassword({ admin_username, email, new_password }) {
+  if (!admin_username || !admin_username.trim()) {
+    throw new Error('Username is required.');
+  }
+  if (!email || !email.trim()) {
+    throw new Error('Email is required.');
+  }
+  if (!new_password || new_password.length < 8) {
+    throw new Error('New password must be at least 8 characters.');
+  }
+  return delay(null);
+}
+
 // ---------- Orders ----------
 
 export async function getOrders({ status, payment_method, search } = {}) {

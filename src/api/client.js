@@ -63,6 +63,12 @@ export async function request(path, { method = 'GET', body, params } = {}) {
     } catch {
       // response had no JSON body — fall through to the generic message below
     }
+    // FastAPI 422s return `detail` as an array of {loc, msg, type} instead of
+    // a string — join the messages so the UI shows readable text instead of
+    // "[object Object]".
+    if (Array.isArray(detail)) {
+      detail = detail.map((d) => d.msg || JSON.stringify(d)).join(' ');
+    }
     throw new Error(detail || `Request failed (${res.status}).`);
   }
 
