@@ -1,6 +1,10 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const TOKEN_KEY = 'vstitch_admin_token';
 const REQUEST_TIMEOUT_MS = 20000;
+// Image uploads carry up to 5MB over multipart, which routinely takes
+// longer than the 20s budget for a small JSON request on a slow/mobile
+// connection — give them more room before treating it as a hang.
+const UPLOAD_TIMEOUT_MS = 60000;
 
 export function getAdminToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -23,8 +27,12 @@ export async function request(path, { method = 'GET', body, params } = {}) {
     });
   }
 
+  // FormData (file uploads) must NOT get a JSON Content-Type — the browser
+  // sets its own multipart boundary header when it sees a FormData body.
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), isFormData ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
   const token = getAdminToken();
 
   let res;
@@ -32,10 +40,10 @@ export async function request(path, { method = 'GET', body, params } = {}) {
     res = await fetch(url.toString(), {
       method,
       headers: {
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? (isFormData ? body : JSON.stringify(body)) : undefined,
       signal: controller.signal,
     });
   } catch (err) {

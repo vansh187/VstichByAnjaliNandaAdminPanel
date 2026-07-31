@@ -119,6 +119,15 @@ export async function getRevenueSummary() {
   });
 }
 
+// ---------- Images ----------
+
+export async function uploadImage(file) {
+  if (!file) throw new Error('No file selected.');
+  // No real storage backend in mock mode — an object URL is good enough to
+  // preview the upload for the rest of the session.
+  return delay({ image_url: URL.createObjectURL(file) });
+}
+
 // ---------- Categories ----------
 
 export async function getCategories() {
