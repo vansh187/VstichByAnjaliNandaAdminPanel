@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Modal } from './Modal.jsx';
 import { CategorySelect } from './CategorySelect.jsx';
+import { ImageUploadField } from './ImageUploadField.jsx';
 import { adminApi } from '../api/index.js';
 
 function emptyImage() {
   return {
     key: Math.random().toString(36).slice(2),
-    image_url: "",
+    image_url: null,
     is_primary: false,
   };
 }
@@ -102,9 +103,9 @@ export function AddProductModal({ open, onClose, categories, onCategoriesChanged
     try {
       const payload = rows.map((r) => {
         const images = r.images
-          .filter((img) => img.image_url.trim())
+          .filter((img) => img.image_url)
           .map((img, idx) => ({
-            image_url: img.image_url.trim(),
+            image_url: img.image_url,
             is_primary: img.is_primary,
             display_order: idx,
           }));
@@ -304,43 +305,44 @@ export function AddProductModal({ open, onClose, categories, onCategoriesChanged
                 <label className="text-[10px] uppercase tracking-[0.1em] text-[#8A8375] block mb-1">Images</label>
                 <div className="space-y-2">
                   {row.images.map((img) => (
-                    <div key={img.key} className="flex items-center gap-2">
-                      <input
+                    <div key={img.key} className="flex items-center gap-3">
+                      <ImageUploadField
+                        imageType="product"
                         value={img.image_url}
-                        onChange={(e) => updateImage(row.key, img.key, { image_url: e.target.value })}
-                        placeholder="https://…/image.jpg"
-                        className="flex-1 bg-[#141210] border border-[#2A2620] rounded-md px-3 py-2 text-sm text-[#EDE7DD] focus:outline-none focus:border-[#C9A24B]"
+                        onUploaded={(url) => updateImage(row.key, img.key, { image_url: url })}
+                        onRemove={() => updateImage(row.key, img.key, { image_url: null, is_primary: false })}
                       />
-                      <label className="flex items-center gap-1 text-[10px] uppercase tracking-[0.1em] text-[#8A8375] whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          checked={img.is_primary}
-                          onChange={(e) =>
-                            setRows((prev) =>
-                              prev.map((r) =>
-                                r.key === row.key
-                                  ? {
-                                      ...r,
-                                      images: r.images.map((i) => ({
-                                        ...i,
-                                        is_primary: i.key === img.key ? e.target.checked : e.target.checked ? false : i.is_primary,
-                                      })),
-                                    }
-                                  : r
+                      {img.image_url && (
+                        <label className="flex items-center gap-1 text-[10px] uppercase tracking-[0.1em] text-[#8A8375] whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={img.is_primary}
+                            onChange={(e) =>
+                              setRows((prev) =>
+                                prev.map((r) =>
+                                  r.key === row.key
+                                    ? {
+                                        ...r,
+                                        images: r.images.map((i) => ({
+                                          ...i,
+                                          is_primary: i.key === img.key ? e.target.checked : e.target.checked ? false : i.is_primary,
+                                        })),
+                                      }
+                                    : r
+                                )
                               )
-                            )
-                          }
-                        />
-                        Primary
-                      </label>
+                            }
+                          />
+                          Primary
+                        </label>
+                      )}
                       {row.images.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeImage(row.key, img.key)}
-                          className="text-[#8A8375] hover:text-[#E0716A] text-lg leading-none px-1"
-                          aria-label="Remove image"
+                          className="ml-auto text-xs font-medium text-[#8A8375] hover:text-[#E0716A] whitespace-nowrap"
                         >
-                          ×
+                          Delete this slot
                         </button>
                       )}
                     </div>
@@ -351,7 +353,7 @@ export function AddProductModal({ open, onClose, categories, onCategoriesChanged
                   onClick={() => addImage(row.key)}
                   className="mt-2 text-xs font-medium text-[#C9A24B] hover:text-[#DAB65E]"
                 >
-                  + Add image URL
+                  + Add another image
                 </button>
               </div>
             </div>

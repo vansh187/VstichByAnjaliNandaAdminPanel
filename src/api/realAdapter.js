@@ -66,6 +66,17 @@ export async function createCategory(payload) {
   return request('/admin/categories', { method: 'POST', body: payload });
 }
 
+// ---------- Images ----------
+
+// image_type tells the backend which storage folder / validation rules to
+// apply ("category" vs "product") — see FRONTEND_IMAGE_UPLOAD_API_REQUEST.md.
+export async function uploadImage(file, imageType) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('image_type', imageType);
+  return request('/admin/images/upload', { method: 'POST', body: formData });
+}
+
 // ---------- Products ----------
 
 export async function getProducts() {

@@ -8,6 +8,7 @@ export function ProductsTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -26,13 +27,20 @@ export function ProductsTab() {
   }, []);
 
   const handleProductsCreated = (created) => {
-    setProducts((prev) => [
-      ...created.map((p) => ({
-        ...p,
-        category_name: categories.find((c) => c.vstitch_category_id === p.category_id)?.category_name || null,
-      })),
-      ...prev,
-    ]);
+    const withCategoryName = created.map((p) => ({
+      ...p,
+      category_name: categories.find((c) => c.vstitch_category_id === p.category_id)?.category_name || null,
+    }));
+    setProducts((prev) => [...withCategoryName, ...prev]);
+
+    if (withCategoryName.length === 1) {
+      const [p] = withCategoryName;
+      setSuccessMessage(`"${p.product_name}" added to ${p.category_name || "the"} category.`);
+    } else {
+      const categoryNames = [...new Set(withCategoryName.map((p) => p.category_name).filter(Boolean))];
+      setSuccessMessage(`${withCategoryName.length} products added to ${categoryNames.join(", ") || "the catalogue"}.`);
+    }
+    setTimeout(() => setSuccessMessage(null), 5000);
   };
 
   const handleCategoriesChanged = (category) => {
@@ -45,6 +53,11 @@ export function ProductsTab() {
         <div className="mb-4 px-4 py-3 rounded-md bg-[#3A1F1F] border border-[#5E2A2A] text-[#E0716A] text-sm flex items-center justify-between">
           {error}
           <button onClick={load} className="underline text-xs">Retry</button>
+        </div>
+      )}
+      {successMessage && (
+        <div className="mb-4 px-4 py-3 rounded-md bg-[#1F3A24] border border-[#2A5E36] text-[#6FCF7A] text-sm">
+          {successMessage}
         </div>
       )}
       <div className="flex items-center justify-between mb-6">
