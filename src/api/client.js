@@ -1,10 +1,10 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const TOKEN_KEY = 'vstitch_admin_token';
 const REQUEST_TIMEOUT_MS = 20000;
-// Image uploads carry up to 5MB over multipart, which routinely takes
+// Image uploads carry up to 10MB over multipart, which routinely takes
 // longer than the 20s budget for a small JSON request on a slow/mobile
 // connection — give them more room before treating it as a hang.
-const UPLOAD_TIMEOUT_MS = 60000;
+const UPLOAD_TIMEOUT_MS = 90000;
 
 export function getAdminToken() {
   return localStorage.getItem(TOKEN_KEY);
