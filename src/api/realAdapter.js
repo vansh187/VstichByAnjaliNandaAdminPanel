@@ -66,6 +66,20 @@ export async function createCategory(payload) {
   return request('/admin/categories', { method: 'POST', body: payload });
 }
 
+// ---------- Coupons ----------
+
+export async function getCoupons() {
+  return request('/admin/coupons');
+}
+
+export async function createCoupon(payload) {
+  return request('/admin/coupons', { method: 'POST', body: payload });
+}
+
+export async function updateCouponStatus(couponId, is_active) {
+  return request(`/admin/coupons/${couponId}`, { method: 'PATCH', body: { is_active } });
+}
+
 // ---------- Images ----------
 
 // image_type tells the backend which storage folder / validation rules to

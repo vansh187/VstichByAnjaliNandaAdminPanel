@@ -120,6 +120,19 @@ const initialOrders = [
   },
 ];
 
+const initialCoupons = [
+  {
+    vstitch_coupon_id: 1, coupon_code: "FESTIVE20", discount_type: "percentage", discount_value: 20,
+    min_order_amount: 2000, max_discount_amount: null, usage_limit: null, used_count: 0,
+    valid_from: daysAgo(10), valid_until: null, is_active: true, created_date: daysAgo(10),
+  },
+  {
+    vstitch_coupon_id: 2, coupon_code: "WELCOME150", discount_type: "flat", discount_value: 150,
+    min_order_amount: null, max_discount_amount: null, usage_limit: null, used_count: 0,
+    valid_from: daysAgo(30), valid_until: null, is_active: true, created_date: daysAgo(30),
+  },
+];
+
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -131,9 +144,11 @@ function load() {
     categories: initialCategories,
     products: initialProducts,
     orders: initialOrders,
+    coupons: initialCoupons,
     nextCategoryId: 5,
     nextProductId: 5,
     nextVariantId: 5,
+    nextCouponId: 3,
   };
 }
 

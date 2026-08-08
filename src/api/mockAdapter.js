@@ -160,6 +160,75 @@ export async function createCategory({ category_name, parent_category_id = null,
   return delay(created);
 }
 
+// ---------- Coupons ----------
+
+export async function getCoupons() {
+  const { coupons = [] } = getDb();
+  return delay([...coupons].sort((a, b) => new Date(b.created_date) - new Date(a.created_date)));
+}
+
+export async function createCoupon({
+  coupon_code,
+  discount_type,
+  discount_value,
+  min_order_amount = null,
+  max_discount_amount = null,
+  usage_limit = null,
+  valid_from = null,
+  valid_until = null,
+}) {
+  if (!coupon_code || !coupon_code.trim()) {
+    throw new Error('Coupon code is required.');
+  }
+  if (!['percentage', 'flat'].includes(discount_type)) {
+    throw new Error('Discount type must be "percentage" or "flat".');
+  }
+  if (!discount_value || Number(discount_value) <= 0) {
+    throw new Error('Enter a valid discount value.');
+  }
+  if (discount_type === 'percentage' && Number(discount_value) > 100) {
+    throw new Error('Percentage discount cannot exceed 100.');
+  }
+  const code = coupon_code.trim().toUpperCase();
+  const { coupons = [] } = getDb();
+  if (coupons.some((c) => c.coupon_code === code)) {
+    throw new Error(`Coupon "${code}" already exists.`);
+  }
+  let created = null;
+  mutateDb((db) => {
+    if (!db.coupons) db.coupons = [];
+    if (!db.nextCouponId) db.nextCouponId = 1;
+    created = {
+      vstitch_coupon_id: db.nextCouponId++,
+      coupon_code: code,
+      discount_type,
+      discount_value: Number(discount_value),
+      min_order_amount: min_order_amount !== null && min_order_amount !== '' ? Number(min_order_amount) : null,
+      max_discount_amount: max_discount_amount !== null && max_discount_amount !== '' ? Number(max_discount_amount) : null,
+      usage_limit: usage_limit !== null && usage_limit !== '' ? Number(usage_limit) : null,
+      used_count: 0,
+      valid_from: valid_from || new Date().toISOString(),
+      valid_until: valid_until || null,
+      is_active: true,
+      created_date: new Date().toISOString(),
+    };
+    db.coupons.push(created);
+  });
+  return delay(created);
+}
+
+export async function updateCouponStatus(couponId, is_active) {
+  let updated = null;
+  mutateDb((db) => {
+    const coupon = (db.coupons || []).find((c) => c.vstitch_coupon_id === couponId);
+    if (!coupon) throw new Error('Coupon not found.');
+    coupon.is_active = is_active;
+    updated = { ...coupon };
+  });
+  if (!updated) throw new Error('Coupon not found.');
+  return delay(updated);
+}
+
 // ---------- Products ----------
 
 export async function getProducts() {
