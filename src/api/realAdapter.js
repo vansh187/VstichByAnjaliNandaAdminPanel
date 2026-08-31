@@ -63,6 +63,54 @@ export async function getRevenueSummary(params) {
   return request('/admin/revenue/summary', { params });
 }
 
+// ---------- Collections ----------
+// See COLLECTIONS_API_CONTRACT.md. A collection is a curated, ordered set of
+// existing products tagged with a season, plus its own banner imagery.
+
+export async function getCollections() {
+  // List is keyset-paginated (after_id / has_more / next_cursor) — walk every
+  // page and hand back a flat array, same as getProducts().
+  return fetchAllPages('/admin/collections', {}, 'items');
+}
+
+export async function getCollection(collectionId) {
+  return request(`/admin/collections/${collectionId}`);
+}
+
+export async function createCollection(payload) {
+  return request('/admin/collections', { method: 'POST', body: payload });
+}
+
+export async function updateCollection(collectionId, patch) {
+  return request(`/admin/collections/${collectionId}`, { method: 'PATCH', body: patch });
+}
+
+export async function deleteCollection(collectionId) {
+  // Soft delete — sets is_active=false. Returns 204 (no body).
+  return request(`/admin/collections/${collectionId}`, { method: 'DELETE' });
+}
+
+// Replaces the collection's ENTIRE ordered product list — the array order is
+// the storefront order. Always send the full desired list, not a delta.
+export async function setCollectionProducts(collectionId, productIds) {
+  return request(`/admin/collections/${collectionId}/products`, {
+    method: 'PUT',
+    body: { product_ids: productIds },
+  });
+}
+
+export async function addCollectionImage(collectionId, payload) {
+  return request(`/admin/collections/${collectionId}/images`, { method: 'POST', body: payload });
+}
+
+export async function updateCollectionImage(collectionId, imageId, patch) {
+  return request(`/admin/collections/${collectionId}/images/${imageId}`, { method: 'PATCH', body: patch });
+}
+
+export async function deleteCollectionImage(collectionId, imageId) {
+  return request(`/admin/collections/${collectionId}/images/${imageId}`, { method: 'DELETE' });
+}
+
 // ---------- Categories ----------
 
 export async function getCategories() {

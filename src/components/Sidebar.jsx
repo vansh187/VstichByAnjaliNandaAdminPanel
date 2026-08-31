@@ -5,6 +5,7 @@ const TABS = [
   { key: "orders", label: "Order Management" },
   { key: "allOrders", label: "All Orders" },
   { key: "products", label: "Product Management" },
+  { key: "collections", label: "Collections" },
   { key: "payments", label: "Payments & Finance" },
   { key: "shipping", label: "Shipping" },
   { key: "marketing", label: "Marketing" },

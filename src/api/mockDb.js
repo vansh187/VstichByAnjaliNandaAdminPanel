@@ -133,10 +133,47 @@ const initialCoupons = [
   },
 ];
 
+const initialCollections = [
+  {
+    vstitch_collection_id: 1,
+    collection_name: "Summer Luxe",
+    slug: "summer-luxe",
+    season: "SUMMER",
+    subtitle: "Lightweight luxury for the warm months",
+    description: "A hand-picked edit of our airiest, most elegant pieces.",
+    display_order: 0,
+    is_active: true,
+    product_ids: [1, 3],
+    images: [],
+  },
+  {
+    vstitch_collection_id: 2,
+    collection_name: "Winter Warmth",
+    slug: "winter-warmth",
+    season: "WINTER",
+    subtitle: "Rich textures for the cold season",
+    description: null,
+    display_order: 1,
+    is_active: true,
+    product_ids: [],
+    images: [],
+  },
+];
+
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      // Older persisted DBs predate collections — backfill so mock mode works
+      // without forcing the user to clear storage.
+      if (!saved.collections) {
+        saved.collections = initialCollections;
+        saved.nextCollectionId = 3;
+        saved.nextCollectionImageId = 1;
+      }
+      return saved;
+    }
   } catch {
     // fall through to defaults
   }
@@ -145,10 +182,13 @@ function load() {
     products: initialProducts,
     orders: initialOrders,
     coupons: initialCoupons,
+    collections: initialCollections,
     nextCategoryId: 5,
     nextProductId: 5,
     nextVariantId: 5,
     nextCouponId: 3,
+    nextCollectionId: 3,
+    nextCollectionImageId: 1,
   };
 }
 
