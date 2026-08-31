@@ -60,6 +60,22 @@ Should reject transitions that skip the documented flow (e.g. `placed` → `deli
 the admin panel is expected to allow manual overrides — flag this as a product decision for whoever
 implements it.
 
+### `POST /admin/orders/{vstitch_order_id}/ready-to-ship`
+Books the Shiprocket shipment + courier/AWB, writes the AWB to our DB, and advances the order to
+`shipped`. This is the **only** trigger for shipment creation — nothing is booked at checkout. It is
+the action behind the "Ready to Ship" button on the admin panel's **All Orders** tab.
+
+- **Admin token only** (same `Authorization: Bearer` token as `POST /admin/login`).
+- Request: no body, no query params.
+- Response `200`: the updated order (same shape as the `GET /admin/orders` list item), with
+  `order_status = "shipped"` and populated `awb_code` / `courier_name` (either may be `null` if the
+  status write lagged — client treats `null` as "refresh the row").
+- `401` invalid/expired token · `404` unknown order · `409` order not in
+  `placed`/`confirmed`/`processing`, or a dispatch already in flight · `502` Shiprocket failure
+  (safe to retry — idempotent, never double-books).
+
+Full request/response detail: see `READY_TO_SHIP_API_REQUEST.md`.
+
 ## Revenue / Dashboard
 
 ### `GET /admin/revenue/summary`

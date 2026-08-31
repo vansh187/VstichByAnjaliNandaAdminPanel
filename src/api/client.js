@@ -77,7 +77,11 @@ export async function request(path, { method = 'GET', body, params } = {}) {
     if (Array.isArray(detail)) {
       detail = detail.map((d) => d.msg || JSON.stringify(d)).join(' ');
     }
-    throw new Error(detail || `Request failed (${res.status}).`);
+    // Attach the HTTP status so callers can branch on it (404 vs 409 vs 502)
+    // without regex-matching the message text.
+    const err = new Error(detail || `Request failed (${res.status}).`);
+    err.status = res.status;
+    throw err;
   }
 
   if (res.status === 204) return null;

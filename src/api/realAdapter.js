@@ -50,6 +50,13 @@ export async function syncOrderStatus(orderId) {
   return request(`/admin/orders/${orderId}/sync-status`, { method: 'POST' });
 }
 
+// Marks a packed order ready for courier pickup — the backend generates the
+// AWB / assigns a courier and advances the order to `shipped`. See the
+// "POST /admin/orders/{id}/ready-to-ship" section of ADMIN_API_CONTRACT.md.
+export async function markOrderReadyToShip(orderId) {
+  return request(`/admin/orders/${orderId}/ready-to-ship`, { method: 'POST' });
+}
+
 // ---------- Revenue ----------
 
 export async function getRevenueSummary(params) {

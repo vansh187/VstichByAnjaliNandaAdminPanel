@@ -83,6 +83,43 @@ export async function syncOrderStatus(orderId) {
   return delay(updated);
 }
 
+const READY_TO_SHIP_ELIGIBLE = new Set(['placed', 'confirmed', 'processing']);
+const MOCK_COURIERS = ['Delhivery', 'Bluedart', 'DTDC', 'Ekart', 'XpressBees'];
+
+// Mirrors the delivered contract in READY_TO_SHIP_API_REQUEST.md — same
+// status codes and `detail` messages so mock mode behaves like production.
+function httpError(message, status) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
+export async function markOrderReadyToShip(orderId) {
+  let updated = null;
+  let failure = null;
+  mutateDb((db) => {
+    const order = db.orders.find((o) => o.vstitch_order_id === orderId);
+    if (!order) {
+      failure = httpError('Order not found', 404);
+      return;
+    }
+    if (!READY_TO_SHIP_ELIGIBLE.has(order.order_status)) {
+      failure = httpError('Order cannot be marked ready to ship from its current status', 409);
+      return;
+    }
+    // Simulate the backend booking a Shiprocket shipment + assigning a courier.
+    if (!order.awb_code) {
+      order.awb_code = String(Math.floor(1e11 + Math.random() * 9e11));
+      order.courier_name = MOCK_COURIERS[Math.floor(Math.random() * MOCK_COURIERS.length)];
+    }
+    order.order_status = 'shipped';
+    updated = { ...order };
+  });
+  if (failure) throw failure;
+  if (!updated) throw httpError('Order not found', 404);
+  return delay(updated);
+}
+
 // ---------- Revenue ----------
 
 export async function getRevenueSummary() {
