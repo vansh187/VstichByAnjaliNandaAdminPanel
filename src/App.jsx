@@ -7,6 +7,7 @@ import { DashboardTab } from './tabs/DashboardTab.jsx';
 import { OrdersTab } from './tabs/OrdersTab.jsx';
 import { AllOrdersTab } from './tabs/AllOrdersTab.jsx';
 import { ProductsTab } from './tabs/ProductsTab.jsx';
+import { CollectionsTab } from './tabs/CollectionsTab.jsx';
 import { PaymentsTab } from './tabs/PaymentsTab.jsx';
 import { ShippingTab } from './tabs/ShippingTab.jsx';
 import { MarketingTab } from './tabs/MarketingTab.jsx';
@@ -17,6 +18,7 @@ const TAB_META = {
   orders: { title: "Order Management", subtitle: "Track and update order status in real time", Comp: OrdersTab },
   allOrders: { title: "All Orders", subtitle: "Every order with one-click Ready to Ship", Comp: AllOrdersTab },
   products: { title: "Product Management", subtitle: "Catalogue, stock and pricing", Comp: ProductsTab },
+  collections: { title: "Collections", subtitle: "Curate seasonal collections like Summer Luxe", Comp: CollectionsTab },
   payments: { title: "Payments & Finance", subtitle: "Reconciliation and revenue", Comp: PaymentsTab },
   shipping: { title: "Shipping", subtitle: "Courier assignment and tracking", Comp: ShippingTab },
   marketing: { title: "Marketing", subtitle: "Coupons, banners and campaigns", Comp: MarketingTab },

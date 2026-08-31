@@ -1,5 +1,6 @@
 import { getDb, mutateDb } from './mockDb.js';
 import { REVENUE_COUNTING_STATUSES, PENDING_ACTION_STATUSES } from '../data/seed.js';
+import { SLUG_PATTERN, SEASONS } from '../data/collections.js';
 
 const LATENCY_MS = 350;
 
@@ -154,6 +155,301 @@ export async function getRevenueSummary() {
     low_stock_count,
     pending_shipments_count,
   });
+}
+
+// ---------- Collections ----------
+// Mirrors COLLECTIONS_API_CONTRACT.md — same status codes and `detail`
+// messages so mock mode behaves like the real backend.
+
+function collectionSummary(c) {
+  const primary = (c.images || []).find((i) => i.is_active && i.is_primary);
+  return {
+    vstitch_collection_id: c.vstitch_collection_id,
+    collection_name: c.collection_name,
+    slug: c.slug,
+    season: c.season,
+    subtitle: c.subtitle ?? null,
+    description: c.description ?? null,
+    display_order: c.display_order ?? 0,
+    is_active: c.is_active !== false,
+    product_count: (c.product_ids || []).length,
+    primary_image_url: primary ? primary.image_url : null,
+  };
+}
+
+function collectionDetail(c) {
+  const images = (c.images || [])
+    .filter((i) => i.is_active)
+    .slice()
+    .sort(
+      (a, b) =>
+        (b.is_primary === true) - (a.is_primary === true) ||
+        (a.display_order ?? 0) - (b.display_order ?? 0)
+    );
+  return {
+    vstitch_collection_id: c.vstitch_collection_id,
+    collection_name: c.collection_name,
+    slug: c.slug,
+    season: c.season,
+    subtitle: c.subtitle ?? null,
+    description: c.description ?? null,
+    display_order: c.display_order ?? 0,
+    is_active: c.is_active !== false,
+    product_ids: [...(c.product_ids || [])],
+    images: images.map((i) => ({ ...i })),
+  };
+}
+
+export async function getCollections() {
+  const { collections = [] } = getDb();
+  const sorted = [...collections].sort(
+    (a, b) =>
+      (a.display_order ?? 0) - (b.display_order ?? 0) ||
+      a.vstitch_collection_id - b.vstitch_collection_id
+  );
+  return delay(sorted.map(collectionSummary));
+}
+
+export async function getCollection(collectionId) {
+  const { collections = [] } = getDb();
+  const c = collections.find((x) => x.vstitch_collection_id === Number(collectionId));
+  if (!c) throw httpError(`Collection ${collectionId} was not found.`, 404);
+  return delay(collectionDetail(c));
+}
+
+export async function createCollection(payload = {}) {
+  const {
+    collection_name,
+    slug,
+    season,
+    subtitle = null,
+    description = null,
+    is_active = true,
+    display_order = 0,
+  } = payload;
+
+  if (!collection_name || !collection_name.trim() || collection_name.length > 250) {
+    throw httpError('collection_name must be 1–250 characters.', 422);
+  }
+  if (!slug || !SLUG_PATTERN.test(slug) || slug.length > 120) {
+    throw httpError("String should match pattern '^[a-z0-9]+(?:-[a-z0-9]+)*$'", 422);
+  }
+  if (!SEASONS.includes(season)) {
+    throw httpError('season must be one of SUMMER, WINTER, SPRING, AUTUMN.', 422);
+  }
+  const { collections = [] } = getDb();
+  if (collections.some((c) => c.slug === slug)) {
+    throw httpError('A collection with this slug already exists.', 409);
+  }
+
+  let created = null;
+  mutateDb((db) => {
+    if (!db.collections) db.collections = [];
+    if (!db.nextCollectionId) db.nextCollectionId = 1;
+    created = {
+      vstitch_collection_id: db.nextCollectionId++,
+      collection_name: collection_name.trim(),
+      slug,
+      season,
+      subtitle: subtitle || null,
+      description: description || null,
+      display_order: Number(display_order) || 0,
+      is_active: is_active !== false,
+      product_ids: [],
+      images: [],
+    };
+    db.collections.push(created);
+  });
+  return delay(collectionDetail(created));
+}
+
+export async function updateCollection(collectionId, patch = {}) {
+  let result = null;
+  let failure = null;
+  mutateDb((db) => {
+    const c = (db.collections || []).find((x) => x.vstitch_collection_id === Number(collectionId));
+    if (!c) {
+      failure = httpError(`Collection ${collectionId} was not found.`, 404);
+      return;
+    }
+    if ('slug' in patch && patch.slug !== null) {
+      if (!SLUG_PATTERN.test(patch.slug) || patch.slug.length > 120) {
+        failure = httpError("String should match pattern '^[a-z0-9]+(?:-[a-z0-9]+)*$'", 422);
+        return;
+      }
+      if (
+        (db.collections || []).some(
+          (o) => o.slug === patch.slug && o.vstitch_collection_id !== c.vstitch_collection_id
+        )
+      ) {
+        failure = httpError('A collection with this slug already exists.', 409);
+        return;
+      }
+    }
+    if ('season' in patch && patch.season !== null && !SEASONS.includes(patch.season)) {
+      failure = httpError('season must be one of SUMMER, WINTER, SPRING, AUTUMN.', 422);
+      return;
+    }
+    // These reject an explicit null.
+    for (const key of ['collection_name', 'slug', 'season', 'is_active', 'display_order']) {
+      if (key in patch) {
+        if (patch[key] === null) {
+          failure = httpError(`${key} cannot be null.`, 422);
+          return;
+        }
+        if (key === 'display_order') c[key] = Number(patch[key]) || 0;
+        else if (key === 'collection_name') c[key] = String(patch[key]).trim();
+        else c[key] = patch[key];
+      }
+    }
+    // These accept an explicit null (clears the field).
+    for (const key of ['subtitle', 'description']) {
+      if (key in patch) c[key] = patch[key] === null || patch[key] === '' ? null : patch[key];
+    }
+    result = collectionDetail(c);
+  });
+  if (failure) throw failure;
+  return delay(result);
+}
+
+export async function deleteCollection(collectionId) {
+  let failure = null;
+  mutateDb((db) => {
+    const c = (db.collections || []).find((x) => x.vstitch_collection_id === Number(collectionId));
+    if (!c) {
+      failure = httpError(`Collection ${collectionId} was not found.`, 404);
+      return;
+    }
+    c.is_active = false;
+  });
+  if (failure) throw failure;
+  return delay(null);
+}
+
+export async function setCollectionProducts(collectionId, productIds) {
+  const ids = Array.isArray(productIds) ? productIds : [];
+  if (ids.some((id, i) => ids.indexOf(id) !== i)) {
+    throw httpError('product_ids contains duplicates.', 422);
+  }
+  if (ids.some((id) => !Number.isInteger(id) || id <= 0)) {
+    throw httpError('product_ids must be positive integers.', 422);
+  }
+  if (ids.length > 500) {
+    throw httpError('product_ids may contain at most 500 items.', 422);
+  }
+
+  let result = null;
+  let failure = null;
+  mutateDb((db) => {
+    const c = (db.collections || []).find((x) => x.vstitch_collection_id === Number(collectionId));
+    if (!c) {
+      failure = httpError(`Collection ${collectionId} was not found.`, 404);
+      return;
+    }
+    const missing = ids.filter((id) => {
+      const p = db.products.find((pr) => pr.vstitch_product_id === id);
+      return !p || p.is_active === false;
+    });
+    if (missing.length > 0) {
+      failure = httpError(`Products not found or inactive: [${missing.join(', ')}].`, 422);
+      return;
+    }
+    c.product_ids = [...ids];
+    result = collectionDetail(c);
+  });
+  if (failure) throw failure;
+  return delay(result);
+}
+
+export async function addCollectionImage(collectionId, payload = {}) {
+  const { image_url, is_primary = false, display_order = 0 } = payload;
+  if (!image_url || image_url.length > 500) {
+    throw httpError('image_url must be 1–500 characters.', 422);
+  }
+
+  let created = null;
+  let failure = null;
+  mutateDb((db) => {
+    const c = (db.collections || []).find((x) => x.vstitch_collection_id === Number(collectionId));
+    if (!c) {
+      failure = httpError(`Collection ${collectionId} was not found.`, 404);
+      return;
+    }
+    if (!c.images) c.images = [];
+    if (!db.nextCollectionImageId) db.nextCollectionImageId = 1;
+    // First image on a collection is forced primary; a new primary demotes the old.
+    const forcedPrimary = c.images.filter((i) => i.is_active).length === 0 ? true : !!is_primary;
+    if (forcedPrimary) c.images.forEach((i) => { i.is_primary = false; });
+    created = {
+      vstitch_collection_image_id: db.nextCollectionImageId++,
+      image_url,
+      is_primary: forcedPrimary,
+      display_order: Number(display_order) || 0,
+      is_active: true,
+    };
+    c.images.push(created);
+  });
+  if (failure) throw failure;
+  return delay({ ...created });
+}
+
+export async function updateCollectionImage(collectionId, imageId, patch = {}) {
+  let result = null;
+  let failure = null;
+  mutateDb((db) => {
+    const c = (db.collections || []).find((x) => x.vstitch_collection_id === Number(collectionId));
+    const img =
+      c && (c.images || []).find((i) => i.vstitch_collection_image_id === Number(imageId) && i.is_active);
+    if (!c || !img) {
+      failure = httpError(`Collection image ${imageId} was not found.`, 404);
+      return;
+    }
+    if ('is_primary' in patch) {
+      if (patch.is_primary === null) {
+        failure = httpError('is_primary cannot be null.', 422);
+        return;
+      }
+      if (patch.is_primary) {
+        c.images.forEach((i) => { i.is_primary = false; });
+        img.is_primary = true;
+      } else {
+        img.is_primary = false;
+      }
+    }
+    if ('display_order' in patch) {
+      if (patch.display_order === null) {
+        failure = httpError('display_order cannot be null.', 422);
+        return;
+      }
+      img.display_order = Number(patch.display_order) || 0;
+    }
+    result = { ...img };
+  });
+  if (failure) throw failure;
+  return delay(result);
+}
+
+export async function deleteCollectionImage(collectionId, imageId) {
+  let failure = null;
+  mutateDb((db) => {
+    const c = (db.collections || []).find((x) => x.vstitch_collection_id === Number(collectionId));
+    const img =
+      c && (c.images || []).find((i) => i.vstitch_collection_image_id === Number(imageId) && i.is_active);
+    if (!c || !img) {
+      failure = httpError(`Collection image ${imageId} was not found.`, 404);
+      return;
+    }
+    img.is_active = false;
+    if (img.is_primary) {
+      img.is_primary = false;
+      const next = c.images
+        .filter((i) => i.is_active)
+        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))[0];
+      if (next) next.is_primary = true;
+    }
+  });
+  if (failure) throw failure;
+  return delay(null);
 }
 
 // ---------- Images ----------
