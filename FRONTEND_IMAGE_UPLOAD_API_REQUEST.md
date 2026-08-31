@@ -71,7 +71,7 @@ type, or file too large)
 { "detail": "Only JPG, PNG, or WEBP images are allowed." }
 ```
 ```json
-{ "detail": "Image must be smaller than 5MB." }
+{ "detail": "Image must be smaller than 10MB." }
 ```
 
 **Response `401`** — same shape as every other admin endpoint:
@@ -86,7 +86,7 @@ as the rest of the API, for storage-backend failures.
 listing them so backend validation matches and a bypassed client can't
 slip something bad through)
 - Accepted types: `image/jpeg`, `image/png`, `image/webp`.
-- Max size: 5 MB.
+- Max size: 10 MB.
 - `image_type` must be `"category"` or `"product"`.
 
 ## Nothing else changes

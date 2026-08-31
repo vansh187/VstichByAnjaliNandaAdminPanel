@@ -22,9 +22,12 @@ function cacheKey(params) {
   return JSON.stringify(params || {});
 }
 
-async function getOrdersCached(params) {
+async function getOrdersCached(params, { force = false } = {}) {
   const key = cacheKey(params);
-  if (ordersCache && ordersCache.key === key && ordersCache.expiresAt > Date.now()) {
+  // `force` is for explicit user actions (a Refresh/Retry click, a post-write
+  // resync) that must reflect reality now — the TTL only exists to make passive
+  // tab-switching cheap.
+  if (!force && ordersCache && ordersCache.key === key && ordersCache.expiresAt > Date.now()) {
     return ordersCache.promise;
   }
   const promise = baseApi.getOrders(params);
@@ -45,9 +48,21 @@ async function syncOrderStatusAndInvalidate(orderId) {
   return result;
 }
 
+async function markOrderReadyToShipAndInvalidate(orderId) {
+  // Invalidate even on failure: a 404/409 means our cached copy of this order
+  // is stale (status moved on, order removed, or a concurrent dispatch), so the
+  // next getOrders() must hit the network to resync the row.
+  try {
+    return await baseApi.markOrderReadyToShip(orderId);
+  } finally {
+    ordersCache = null;
+  }
+}
+
 export const adminApi = {
   ...baseApi,
   getOrders: getOrdersCached,
   updateOrderStatus: updateOrderStatusAndInvalidate,
   syncOrderStatus: syncOrderStatusAndInvalidate,
+  markOrderReadyToShip: markOrderReadyToShipAndInvalidate,
 };

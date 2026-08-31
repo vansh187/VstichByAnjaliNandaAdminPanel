@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { adminApi } from '../api/index.js';
 
-const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB, matches the limit documented for backend team
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB, matches the limit documented for backend team
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 // Mock mode returns blob: object URLs (see mockAdapter.uploadImage) which
@@ -33,7 +33,7 @@ export function ImageUploadField({ imageType, value, onUploaded, onRemove, disab
       return;
     }
     if (file.size > MAX_FILE_BYTES) {
-      setError('Image must be smaller than 5MB.');
+      setError('Image must be smaller than 10MB.');
       return;
     }
 

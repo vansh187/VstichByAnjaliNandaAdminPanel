@@ -60,6 +60,22 @@ Should reject transitions that skip the documented flow (e.g. `placed` → `deli
 the admin panel is expected to allow manual overrides — flag this as a product decision for whoever
 implements it.
 
+### `POST /admin/orders/{vstitch_order_id}/ready-to-ship`
+Books the Shiprocket shipment + courier/AWB, writes the AWB to our DB, and advances the order to
+`shipped`. This is the **only** trigger for shipment creation — nothing is booked at checkout. It is
+the action behind the "Ready to Ship" button on the admin panel's **All Orders** tab.
+
+- **Admin token only** (same `Authorization: Bearer` token as `POST /admin/login`).
+- Request: no body, no query params.
+- Response `200`: the updated order (same shape as the `GET /admin/orders` list item), with
+  `order_status = "shipped"` and populated `awb_code` / `courier_name` (either may be `null` if the
+  status write lagged — client treats `null` as "refresh the row").
+- `401` invalid/expired token · `404` unknown order · `409` order not in
+  `placed`/`confirmed`/`processing`, or a dispatch already in flight · `502` Shiprocket failure
+  (safe to retry — idempotent, never double-books).
+
+Full request/response detail: see `READY_TO_SHIP_API_REQUEST.md`.
+
 ## Revenue / Dashboard
 
 ### `GET /admin/revenue/summary`
@@ -140,6 +156,63 @@ reporting, not an all-or-nothing 400.
 ### `GET /admin/returns`
 ### `PATCH /admin/returns/{id}/status`
 Request: `{ status }` — one of `requested, approved, rejected, picked_up, completed, cancelled`
+
+## Marketing — Coupons
+
+Net-new. Requires a new `VStitch_Coupons` table — no coupon/discount concept exists in the schema
+today. Naming below follows the existing convention (`vstitch_coupon_id`, snake_case columns).
+
+Suggested `VStitch_Coupons` columns:
+```
+vstitch_coupon_id      PK, serial
+coupon_code            varchar, UNIQUE, e.g. "FESTIVE20"  (store upper-cased)
+discount_type          varchar CHECK IN ('percentage', 'flat')
+discount_value         numeric  -- % (0-100) if percentage, ₹ amount if flat
+min_order_amount       numeric, nullable  -- order subtotal must meet this to apply
+max_discount_amount    numeric, nullable  -- cap on ₹ discount for percentage coupons
+usage_limit            integer, nullable  -- total redemptions allowed; null = unlimited
+used_count             integer, default 0 -- incremented by the checkout/order flow on redemption
+valid_from             timestamp, default now()
+valid_until            timestamp, nullable  -- null = no expiry
+is_active              boolean, default true
+created_date           timestamp, default now()
+```
+
+### `GET /admin/coupons`
+List all coupons (active and inactive), newest first.
+
+Response: `[{ vstitch_coupon_id, coupon_code, discount_type, discount_value, min_order_amount,
+max_discount_amount, usage_limit, used_count, valid_from, valid_until, is_active, created_date }]`
+
+### `POST /admin/coupons`
+Creates a coupon — this is what the admin panel's "+ Add Coupon" button submits.
+
+Request:
+```json
+{
+  "coupon_code": "FESTIVE20",
+  "discount_type": "percentage",
+  "discount_value": 20,
+  "min_order_amount": 2000,
+  "max_discount_amount": null,
+  "usage_limit": null,
+  "valid_until": null
+}
+```
+- `coupon_code` — required, should be upper-cased and trimmed server-side too; reject if it collides
+  with an existing code (case-insensitive) with a 409 and a clear message ("coupon code already exists").
+- `discount_type` — required, one of `percentage` | `flat`.
+- `discount_value` — required, > 0; if `discount_type` is `percentage`, must also be ≤ 100.
+- `min_order_amount`, `max_discount_amount`, `usage_limit`, `valid_until` — all optional/nullable.
+
+Response: the created coupon, same shape as the list item above (`used_count: 0`, `is_active: true`,
+`valid_from`/`created_date` set server-side to now).
+
+### `PATCH /admin/coupons/{vstitch_coupon_id}`
+Toggles a coupon on/off (used for deactivating instead of deleting, so redemption history is preserved).
+
+Request: `{ is_active }`
+Response: the updated coupon (same shape as list item)
 
 ## Shipping ops — proxy, don't expose the ops key to the browser
 

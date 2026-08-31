@@ -3,6 +3,7 @@ import { Icon, icons } from './Icon.jsx';
 const TABS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "orders", label: "Order Management" },
+  { key: "allOrders", label: "All Orders" },
   { key: "products", label: "Product Management" },
   { key: "payments", label: "Payments & Finance" },
   { key: "shipping", label: "Shipping" },

@@ -50,6 +50,13 @@ export async function syncOrderStatus(orderId) {
   return request(`/admin/orders/${orderId}/sync-status`, { method: 'POST' });
 }
 
+// Marks a packed order ready for courier pickup — the backend generates the
+// AWB / assigns a courier and advances the order to `shipped`. See the
+// "POST /admin/orders/{id}/ready-to-ship" section of ADMIN_API_CONTRACT.md.
+export async function markOrderReadyToShip(orderId) {
+  return request(`/admin/orders/${orderId}/ready-to-ship`, { method: 'POST' });
+}
+
 // ---------- Revenue ----------
 
 export async function getRevenueSummary(params) {
@@ -64,6 +71,20 @@ export async function getCategories() {
 
 export async function createCategory(payload) {
   return request('/admin/categories', { method: 'POST', body: payload });
+}
+
+// ---------- Coupons ----------
+
+export async function getCoupons() {
+  return request('/admin/coupons');
+}
+
+export async function createCoupon(payload) {
+  return request('/admin/coupons', { method: 'POST', body: payload });
+}
+
+export async function updateCouponStatus(couponId, is_active) {
+  return request(`/admin/coupons/${couponId}`, { method: 'PATCH', body: { is_active } });
 }
 
 // ---------- Images ----------
